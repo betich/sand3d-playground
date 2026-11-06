@@ -122,4 +122,4 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const port = Number(process.env.PORT ?? 8787);
-serve({ fetch: app.fetch, port }, () => console.log(`sand3d playground api on http://localhost:${port}`));
+serve({ fetch: app.fetch, port }, () => console.log(`sand3d-playground api on http://localhost:${port}`));

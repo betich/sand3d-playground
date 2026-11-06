@@ -1,38 +1,80 @@
 <img src="assets/icon.svg" width="64" height="64" alt="">
 
-# sand3d playground
+# sand3d-playground
 
-Chat with Claude to make 3D objects with [sand3d](https://github.com/Sandflow-ai/sand3d).
-Claude writes a sand3d program and builds it in Blender (`bpy`). It looks at a render of the result and fixes
-what's wrong. You get a three.js GLB preview, a URDF view with a slider per joint, and the raw
-program / URDF / USDA under the preview.
+Chat with Claude → get a 3D object built with [sand3d](https://github.com/Sandflow-ai/sand3d).
+
+![sand3d-playground: chat on the left, GLB preview and program on the right](assets/screenshot.png)
+
+## Requirements
+
+| Tool | Why |
+| --- | --- |
+| Node 22+ | UI + API server |
+| [uv](https://docs.astral.sh/uv/) | Python 3.13 env for sand3d + Blender `bpy` |
+| Claude Code login **or** `ANTHROPIC_API_KEY` | Agent SDK auth |
+
+## Claude Code setup
+
+| Step | Command |
+| --- | --- |
+| 1. Install Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` |
+| 2. Log in (opens browser) | `claude` → `/login` |
+| 3. Check it works | `claude -p "say hi"` |
+| Alternative: API key instead of login | `export ANTHROPIC_API_KEY=sk-ant-...` |
+
+- The app reuses that login automatically. No config file needed.
+- Your own `CLAUDE.md`, hooks, plugins and MCP servers are **ignored** (`settingSources: []`).
+- Claude can only call `build_model`, `WebSearch`, `WebFetch`.
+- Model is picked in the top-right dropdown.
+- Cost per turn is shown under each reply.
 
 ## Run
 
 ```bash
 cd engine && uv sync && cd ..   # Python 3.13 + sand3d + bpy
 npm install
-npm run dev                     # API on :8787, UI on http://localhost:5173
+npm run dev                     # API :8787 · UI http://localhost:5173
 ```
 
-Auth goes through the Claude Agent SDK, which uses your Claude Code login or `ANTHROPIC_API_KEY`.
+| Env var | Default | Effect |
+| --- | --- | --- |
+| `PORT` | `8787` | API port |
+| `NODE_ENV=production` | — | set by `npm start`; serves `dist/` (run `npm run build` first) |
 
-## How it fits together
+## Features
 
-- `server/agent.ts`: Agent SDK `query()` with one in-process MCP tool, `build_model(code)`.
-  The system prompt carries sand3d's `docs/api.md` and `docs/guidelines.md`. Sessions resume across turns,
-  and images you attach go in as image content blocks.
-- `engine/run.py`: runs a program's `build()`, exports GLB / URDF / USDA / STL, and renders a
-  workbench PNG that goes back to the model so it can check its own work.
-- `src/`: React + Vite + three.js, with `urdf-loader` for the joints view.
-  You can edit the program by hand and run it without the model. The next chat turn tells Claude about your edit.
-- Every build is kept in `runs/<session>/v<n>/`. Each chat is saved to `runs/<session>/session.json`
-  and listed under the chat title's ▾ menu, with a link of the form `/?chat=<id>`.
-- **Modes** (`server/modes.ts`): Free, Engineering part, Low-poly asset, and Mechanism / robot. Each mode
-  adds its own rules to Claude's system prompt, has option chips (process/material, triangle budget/style,
-  actuation/target), and runs checks after each build (overall size, triangles against the budget, joint list).
-  **✦ Improve** rewrites your draft into a full brief using the mode, its options, attached images and
-  the current model. Anything it guessed is marked "(assumed)".
-- `/explore` browses the [sand3d collection](https://huggingface.co/collections/Sandflow/sand3d-6aec268fbdcd3bc174236168)
-  (Objaverse, CAD, Articraft, SimReady, AutoMate) through HF datasets-server. Clicking an object builds its
-  program locally and shows the code under the preview, and *New chat from this* starts a chat from it.
+| Feature | Where |
+| --- | --- |
+| Chat → sand3d program → Blender build → render → self-fix | left panel |
+| GLB preview (wire / edges / grid / PNG) | `GLB · three.js` tab |
+| Joint sliders | `URDF · joints` tab |
+| Program / URDF / USDA, hand-editable | under the preview |
+| Every build kept, switchable | `v1 … vN` |
+| Downloads | `↓GLB ↓URDF ↓USDA ↓STL ↓PY` |
+| Chat history | chat title `▾` · link `/?chat=<id>` |
+| Image input | `+ Image` |
+| Prompt rewrite into a full brief | `✦ Improve` (guesses marked "(assumed)") |
+| Browse + rebuild the HF sand3d collection | `Collection` (`/explore`) |
+
+## Modes
+
+| Mode | Options | Checks after each build |
+| --- | --- | --- |
+| Free | — | — |
+| Engineering part | process, material | overall size |
+| Low-poly asset | triangle budget, style, target | tris vs budget |
+| Mechanism / robot | actuation, target | joint list |
+
+## Layout
+
+| Path | What |
+| --- | --- |
+| `server/agent.ts` | Agent SDK `query()` + in-process MCP tool `build_model(code)` |
+| `server/prompt.ts` | system prompt (sand3d `docs/api.md` + `docs/guidelines.md`) |
+| `server/modes.ts` | mode rules, option chips, post-build checks |
+| `server/store.ts` | chat persistence |
+| `engine/run.py` | runs `build()` → GLB / URDF / USDA / STL + workbench PNG |
+| `src/` | React + Vite + three.js + `urdf-loader` |
+| `runs/<chat>/v<n>/` | build outputs |
+| `runs/<chat>/session.json` | saved chat |
